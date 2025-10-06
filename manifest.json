@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Project Hermes — Web Guide",
+  "description": "An accessibility-first AI companion that highlights targets like Sign in, Checkout, etc.",
+  "version": "0.1.1",
+  "icons": { "128": "assets/icon-128.png" },
+  "action": { "default_popup": "src/popup/popup.html", "default_title": "Project Hermes" },
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["src/content.js"],
+    "css": ["src/overlay.css"],
+    "run_at": "document_idle",
+    "all_frames": true
+  }],
+  "side_panel": { "default_path": "src/sidepanel.html" }
+}
