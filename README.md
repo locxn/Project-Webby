@@ -1,6 +1,6 @@
 ## README.md
 Quick start and notes.
-```markdown
+
 # Project Hermes — Quick Start
 
 1. **Download / clone** this folder.
@@ -30,4 +30,3 @@ Quick start and notes.
 - Multi‑element guidance (step 1/2/3 arrows).
 - Per‑site fine‑tuning of selectors.
 - Desktop overlay app (post‑MVP).
-```
