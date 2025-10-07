@@ -1,5 +1,7 @@
 // src/background.js
-import { MSG } from "./messaging.js";
+const MSG = {
+  HIGHLIGHT_SIGN_IN: "HERMES_HIGHLIGHT_SIGN_IN"
+};
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Project Hermes installed.");
