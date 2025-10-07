@@ -15,6 +15,12 @@
         <button id="btn-by-text">Highlight</button>
       </div>
       <button id="btn-clear" class="ghost">Clear highlights</button>
+      <button id="reload-ext" class="ghost">Reload Hermes (dev)</button>
+      <script>
+      document.getElementById('reload-ext')?.addEventListener('click', () => {
+        chrome.runtime.reload();
+      });
+      </script>
     </main>
     <script type="module" src="popup.js"></script>
   </body>
