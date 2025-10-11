@@ -1,7 +1,7 @@
 ## README.md
 Quick start and notes.
 
-# Project Hermes — Quick Start
+# Project Webby — Quick Start
 
 1. **Download / clone** this folder.
 2. Open **Chrome → Extensions → Developer mode → Load unpacked** → select the `project-hermes` folder.
