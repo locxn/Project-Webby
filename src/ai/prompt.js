@@ -21,12 +21,13 @@ Requirements:
   "confidence": 0.0,
   "website": { "url": "...", "title": "..." },
   "steps": [
-    { "instruction": "Clear action", "selector_hint": "Optional selector text or visible label", "notes": "Optional" }
+    { "instruction": "Clear action", "selector_hint": "Optional selector text or visible label", "urlIncludes": "Optional URL substring (e.g., results.html or /account)", "notes": "Optional" }
   ]
 }
 \`\`\`
 
 - "selector_hint" should reference the most likely on-page label or simple selector guess (ids, text).
+- Include "urlIncludes" for each step when possible, using a short URL substring that indicates the page where the action occurs (e.g., "results.html" or "/account").
 - If the page context is missing, produce a reasonable plan from the question alone.
 - Never include secrets or private data in the plan. Keep it page-context only.
 `;

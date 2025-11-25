@@ -352,6 +352,8 @@
       .hermes-panel {
         position: fixed; right: 20px; bottom: 76px;
         width: 380px; max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 120px);
+        overflow: auto;
         pointer-events: auto;
         background: var(--bg); color: var(--fg);
         border: 2px solid var(--border); border-radius: 12px;
@@ -836,11 +838,10 @@
           appendMsg("bot", res?.error || "AI request failed.");
           return;
         }
-        // Replace last "Thinking…" with real content by just appending result for simplicity
         const content = res.content || "";
-        appendMsg("bot", content);
-
-        const plan = extractJsonPlan(content);
+        const { message, plan } = splitAiContent(content);
+        const finalMsg = message && message.trim().length ? message.trim() : (plan?.goal ? `Plan ready: ${plan.goal}` : "I created steps for you below.");
+        appendMsg("bot", finalMsg);
         if (plan) {
           renderPlan(plan);
         }
@@ -860,6 +861,15 @@
       } catch {
         return null;
       }
+    }
+
+    // Split AI content into a human-friendly message and an optional JSON plan
+    function splitAiContent(text) {
+      if (!text) return { message: "", plan: null };
+      const plan = extractJsonPlan(text);
+      // Remove fenced json code blocks from the visible message
+      const message = text.replace(/```json[\s\S]*?```/gi, "").trim();
+      return { message, plan };
     }
 
     function renderPlan(plan) {
@@ -884,7 +894,7 @@
 
       container.querySelector("#ai-plan-run")?.addEventListener("click", () => {
         createDynamicGuideFromPlan(plan);
-        uiControl.open();
+        uiControl.close();
       });
     }
     // History: seed demo guides and render
@@ -986,17 +996,50 @@
         controlsEl.innerHTML = `
           <span class="status" id="guide-status">Step 1 of 1</span>
           <button type="button" class="btn-lg ghost" id="guide-back" aria-label="Back step">Back</button>
+          <button type="button" class="btn-lg" id="guide-play" aria-label="Play step">Play</button>
           <button type="button" class="btn-lg" id="guide-next" aria-label="Next step">Next</button>
           <button type="button" class="btn-lg ghost" id="guide-exit" aria-label="Exit guide">Exit</button>
         `;
         shadow.appendChild(controlsEl);
         shadow.getElementById("guide-back")?.addEventListener("click", prevStep);
+        shadow.getElementById("guide-play")?.addEventListener("click", markCurrentStep);
         shadow.getElementById("guide-next")?.addEventListener("click", nextStep);
         shadow.getElementById("guide-exit")?.addEventListener("click", stopGuide);
       }
     }
 
     const guideState = { id: null, index: 0, running: false };
+
+    // Auto-reassess and auto-advance support
+
+    function elementForStep(step) {
+      if (!step) return null;
+      try {
+        if (step.selector) {
+          const el = document.querySelector(step.selector);
+          if (el && isVisible(el)) return el;
+        }
+      } catch {}
+      if (step.textHint) {
+        try {
+          const el = findByVisibleText(step.textHint, document);
+          if (el && isVisible(el)) return el;
+        } catch {}
+      }
+      return null;
+    }
+
+
+    // Auto Back if we detect the previous step's page/target is active
+
+
+
+
+
+    // Redirect-planning (throttled) when we cannot auto-redirect with a click
+
+
+
 
     function setUIVisibility(on) {
       if (!breadcrumbEl || !tooltipEl || !controlsEl) return;
@@ -1083,6 +1126,17 @@
       renderBreadcrumb();
       setStatus(`Step ${i + 1} of ${g.steps.length}: ${step.instruction}`);
       clearHighlights();
+      tooltipEl?.removeAttribute("open");
+      saveRun();
+    }
+
+    // Mark current step: highlights target and speaks instruction only when user presses Play
+    function markCurrentStep() {
+      const g = guides[guideState.id];
+      if (!g) return;
+      const i = guideState.index;
+      const step = g.steps[i];
+      clearHighlights();
 
       let target = null;
       try {
@@ -1091,16 +1145,18 @@
       if (!target && step.textHint) {
         try { target = findByVisibleText(step.textHint, document); } catch {}
       }
+
       if (target && isVisible(target)) {
         if (step.scroll) target.scrollIntoView({ behavior: "smooth", block: "center" });
-        // Keep highlight visible for long enough; we'll clear on navigation/stop or next step
         drawRingAround(target, { label: "", circle: false, ttlMs: 600000 });
         placeTooltipFor(target, step.instruction);
+        tooltipEl?.setAttribute("open", "");
       } else {
         // Fallback: show tooltip near top-left with instruction
         placeTooltipFor(null, step.instruction);
+        tooltipEl?.setAttribute("open", "");
       }
-      saveRun();
+
       if (settings.voiceHints) speak(step.instruction);
     }
 
@@ -1111,7 +1167,13 @@
         guideState.index += 1;
         showCurrentStep();
       } else {
-        appendMsg("bot", "Guide complete.");
+        const last = g.steps[g.steps.length - 1];
+        if (last?.urlIncludes && location.href.includes(last.urlIncludes)) {
+          appendMsg("bot", "Arrived at destination. Guide ended.");
+          toast("Arrived at destination.");
+        } else {
+          appendMsg("bot", "Guide complete.");
+        }
         stopGuide();
       }
     }
@@ -1148,6 +1210,8 @@
       guideState.index = 0;
       guideState.running = true;
       setUIVisibility(true);
+      // Close the panel to reveal the page when a guide starts
+      uiControl.close();
       // Persist dynamic AI guide steps if needed
       if (id === "ai-plan" && Array.isArray(dynamicGuideSteps) && dynamicGuideSteps.length) {
         try { chrome.storage?.local?.set({ [DYNAMIC_AI_KEY]: dynamicGuideSteps }); } catch {}
@@ -1176,6 +1240,8 @@
             guideState.index = run.index || 0;
             guideState.running = true;
             setUIVisibility(true);
+            // Close the panel if resuming a running guide so the page is visible
+            uiControl.close();
             showCurrentStep();
           }
         }
@@ -1192,11 +1258,11 @@
         const hint = s.selector_hint || "";
         // Heuristic: treat #,.,[ as CSS selectors, otherwise as visible text hint
         if (/^[#.\[]/.test(hint) || /\s/.test("") ) {
-          steps.push({ selector: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+          steps.push({ selector: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true, urlIncludes: s.urlIncludes });
         } else if (hint) {
-          steps.push({ textHint: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+          steps.push({ textHint: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true, urlIncludes: s.urlIncludes });
         } else {
-          steps.push({ instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+          steps.push({ instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true, urlIncludes: s.urlIncludes });
         }
       }
       dynamicGuideSteps = steps;
