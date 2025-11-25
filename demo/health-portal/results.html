@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Demo Health Portal — Test Results</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111;
+      --accent: #1a73e8;
+      --muted: #555;
+      --card: #f7f9fc;
+      --border: #e3e8ef;
+    }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    header {
+      position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--border);
+      padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { font-weight: 800; font-size: 20px; }
+    nav a {
+      margin: 0 8px; text-decoration: none; color: var(--accent); font-weight: 700;
+      padding: 6px 8px; border-radius: 8px; border: 2px solid transparent;
+    }
+    nav a:focus { outline: none; border-color: #ffcc00; }
+    main { padding: 20px 16px; max-width: 900px; margin: 0 auto; }
+    .subtle { color: var(--muted); }
+    .list { margin-top: 16px; }
+    .result {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .result h3 { margin: 0 0 6px; }
+    .badge { display: inline-block; font-weight: 800; color: #2e7d32; background: #e8f5e9; border-radius: 999px; padding: 4px 8px; }
+    .actions a, .actions button {
+      display: inline-block; background: var(--accent); color: #fff; font-weight: 800;
+      padding: 10px 12px; border-radius: 10px; text-decoration: none; border: none; cursor: pointer;
+      margin-left: 8px;
+    }
+    .actions .ghost {
+      background: transparent; color: var(--accent); border: 2px solid var(--accent);
+    }
+    .actions a:focus, .actions button:focus { outline: 3px solid #ffcc00; outline-offset: 2px; }
+    footer { padding: 24px 16px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand" id="nav-dashboard" aria-label="Dashboard">Health Portal</div>
+    <nav aria-label="Main">
+      <a id="nav-results" href="./results.html" aria-current="page">Results</a>
+      <a id="nav-benefits" href="#" aria-disabled="true">Benefits</a>
+      <a id="nav-profile" href="#" aria-disabled="true">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Test Results</h1>
+    <p class="subtle">Your recent lab results. Select the latest to view details and download a copy.</p>
+
+    <div class="list">
+      <div id="latest-result" class="result" tabindex="0" aria-label="Latest result: A1C">
+        <div>
+          <h3>Hemoglobin A1C</h3>
+          <div class="subtle">Collected Oct 12, 2025 • Status <span class="badge">Final</span></div>
+        </div>
+        <div class="actions">
+          <button class="ghost" type="button">Open</button>
+          <a id="download-pdf" href="#" role="button" aria-label="Download PDF">Download PDF</a>
+        </div>
+      </div>
+
+      <div class="result">
+        <div>
+          <h3>Cholesterol Panel</h3>
+          <div class="subtle">Collected Sep 3, 2025 • Status Final</div>
+        </div>
+        <div class="actions">
+          <button class="ghost" type="button">Open</button>
+          <a href="#" role="button">Download PDF</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Demo pages for Project Hermes prototype. Use the extension panel to run guides.
+  </footer>
+</body>
+</html>

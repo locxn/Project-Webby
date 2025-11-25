@@ -10,7 +10,9 @@
       PING: "HERMES_PING",                          // Ping message for health check (unused here)
       HIGHLIGHT_SIGN_IN: "HERMES_HIGHLIGHT_SIGN_IN",  // Command to highlight the best "Sign in" button
       HIGHLIGHT_BY_TEXT: "HERMES_HIGHLIGHT_BY_TEXT",  // Command to highlight element by visible text
-      CLEAR_HIGHLIGHTS: "HERMES_CLEAR_HIGHLIGHTS"     // Command to clear all highlights
+      CLEAR_HIGHLIGHTS: "HERMES_CLEAR_HIGHLIGHTS",     // Command to clear all highlights
+      OPEN_PANEL: "HERMES_OPEN_PANEL",                 // Command to open assistant panel
+      TOGGLE_PANEL: "HERMES_TOGGLE_PANEL"              // Command to toggle assistant panel
     };
   
     // Normalize a string for case-insensitive, whitespace-normalized comparisons
@@ -134,6 +136,9 @@
   
     // Set to track currently active highlight ring and label elements for cleanup
     const rings = new Set();
+  
+    // UI control hooks for assistant panel; populated by initAssistantUI
+    const uiControl = { open: () => {}, close: () => {}, toggle: () => {} };
   
     // Draw a highlight ring around a given element with optional label and styling
     // The ring and label are positioned absolutely in the overlay root and track element size changes
@@ -277,8 +282,941 @@
         case MSG.CLEAR_HIGHLIGHTS: 
           // Clear all highlights on the page
           return void clearHighlights();
+        case MSG.OPEN_PANEL:
+          // Open assistant panel
+          return void uiControl.open();
+        case MSG.TOGGLE_PANEL:
+          // Toggle assistant panel
+          return void uiControl.toggle();
         default: 
           break;
       }
     });
+
+  // ===== Assistant UI (floating button + basic panel) =====
+  function initAssistantUI() {
+    try { if (window.top !== window) return; } catch {}
+    if (document.getElementById("__hermes_ui_host")) return;
+
+    const host = document.createElement("div");
+    host.id = "__hermes_ui_host";
+    // Slightly below overlay root to allow rings to draw above if needed
+    Object.assign(host.style, { position: "fixed", inset: "0", zIndex: 2147483646, pointerEvents: "none" });
+    document.documentElement.appendChild(host);
+
+    const shadow = host.attachShadow({ mode: "open" });
+
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; }
+      *, *::before, *::after { box-sizing: border-box; }
+
+      /* Design tokens and accessibility variables */
+      :host {
+        --bg: #ffffff;
+        --fg: #111111;
+        --accent: #1a73e8;
+        --accent-contrast: #ffffff;
+        --border: #0002;
+        --shadow: 0 8px 24px rgba(0,0,0,.2);
+        --focus: #ffd54f;
+        --fs: 18px;
+      }
+      :host([data-text-size="small"]) { --fs: 14px; }
+      :host([data-text-size="medium"]) { --fs: 16px; }
+      :host([data-text-size="large"]) { --fs: 18px; }
+
+      :host([data-contrast="high"]) {
+        --bg: #ffffff;
+        --fg: #000000;
+        --accent: #0b57d0;
+        --accent-contrast: #ffffff;
+        --border: #000;
+        --shadow: 0 8px 24px rgba(0,0,0,.35);
+        --focus: #ffcc00;
+      }
+
+      .hermes-fab {
+        position: fixed; right: 20px; bottom: 20px;
+        pointer-events: auto;
+        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--accent-contrast);
+        background: var(--accent);
+        border: none; border-radius: 999px;
+        padding: 14px 18px;
+        box-shadow: 0 4px 12px rgba(0,0,0,.25);
+        cursor: pointer;
+      }
+      .hermes-fab:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+      .hermes-panel {
+        position: fixed; right: 20px; bottom: 76px;
+        width: 380px; max-width: calc(100vw - 40px);
+        pointer-events: auto;
+        background: var(--bg); color: var(--fg);
+        border: 2px solid var(--border); border-radius: 12px;
+        box-shadow: var(--shadow);
+        display: none;
+      }
+      .hermes-panel[open] { display: block; }
+
+      .hermes-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 14px; border-bottom: 1px solid var(--border);
+      }
+      .hermes-title {
+        font: 800 calc(var(--fs) + 2px)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .hermes-close {
+        font: 700 calc(var(--fs) - 2px)/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: transparent; border: 2px solid transparent; color: var(--accent); cursor: pointer;
+        padding: 6px 8px; border-radius: 6px;
+      }
+      .hermes-close:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+      /* Tabs */
+      .tabs { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+      .tab {
+        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: transparent; color: var(--fg);
+        border-radius: 8px; border: 2px solid transparent;
+        padding: 8px 10px; cursor: pointer;
+      }
+      .tab[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+      .tab:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+      .panel { padding: 12px; font: 600 var(--fs)/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      [hidden] { display: none !important; }
+
+      /* Chat */
+      .chat-log {
+        height: 220px; overflow: auto; border: 1px solid var(--border);
+        border-radius: 10px; padding: 10px; background: #fafafa;
+      }
+      .msg { margin: 8px 0; }
+      .msg .role { font-weight: 800; margin-right: 6px; }
+      .msg.user .role { color: var(--accent); }
+      .msg.bot .role { color: #2e7d32; }
+      .chat-input-row {
+        margin-top: 10px; display: flex; gap: 8px;
+      }
+      .chat-input-row input[type="text"] {
+        flex: 1; font: 600 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+      }
+      .chat-input-row button {
+        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--accent); color: var(--accent-contrast);
+        border: none; border-radius: 8px; padding: 10px 12px; cursor: pointer;
+      }
+      .chat-input-row button:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+      /* History */
+      .history-list { list-style: none; padding: 0; margin: 0; }
+      .history-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin: 8px 0; background: #fff; }
+      .history-title { font-weight: 800; margin-bottom: 4px; }
+      .history-desc { font-weight: 600; opacity: .85; margin-bottom: 8px; }
+      .history-actions button {
+        font: 700 calc(var(--fs) - 2px)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: transparent; color: var(--accent);
+        border: 2px solid var(--accent); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+      }
+
+      /* Settings */
+      .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+      .setting label { font-weight: 800; }
+      .setting input[type="checkbox"], .setting select { transform: scale(1.2); }
+      .privacy { margin-top: 10px; font-weight: 600; }
+
+      /* Enabled OFF banner */
+      .off-banner {
+        background: #fff3cd; color: #5f4b00; border: 1px solid #ffe58f;
+        padding: 8px 10px; border-radius: 8px; margin-bottom: 8px; font-weight: 700;
+      }
+    `;
+    shadow.appendChild(style);
+
+    // Additional styles for Guide overlay (breadcrumb, tooltip, controls)
+    const guideStyle = document.createElement("style");
+    guideStyle.textContent = `
+      .guide-breadcrumb {
+        position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+        max-width: 90vw; background: var(--bg); color: var(--fg);
+        border: 2px solid var(--border); border-radius: 999px;
+        box-shadow: var(--shadow); padding: 8px 12px;
+        display: none; gap: 6px; align-items: center; pointer-events: auto; z-index: 2;
+        font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .guide-breadcrumb[open] { display: inline-flex; flex-wrap: wrap; }
+      .guide-breadcrumb .crumb { cursor: pointer; color: var(--accent); }
+      .guide-breadcrumb .crumb[aria-current="step"] { color: var(--fg); cursor: default; text-decoration: underline; }
+      .guide-breadcrumb .sep { opacity: .6; padding: 0 4px; }
+
+      .guide-tooltip {
+        position: fixed; left: 20px; top: 20px;
+        max-width: min(420px, 90vw);
+        background: var(--bg); color: var(--fg);
+        border: 2px solid var(--border); border-radius: 12px;
+        box-shadow: var(--shadow); padding: 12px;
+        display: none; pointer-events: auto; z-index: 2;
+        font: 700 calc(var(--fs)) /1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .guide-tooltip[open] { display: block; }
+
+      .guide-controls {
+        position: fixed; right: 20px; bottom: 160px;
+        display: none; gap: 8px; align-items: center; pointer-events: auto; z-index: 2;
+      }
+      .guide-controls[open] { display: flex; flex-wrap: wrap; }
+      .guide-controls .status {
+        font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #fff3cd; color: #5f4b00; border: 1px solid #ffe58f;
+        padding: 6px 10px; border-radius: 8px; margin-right: 6px;
+      }
+      .guide-controls .btn-lg {
+        font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--accent); color: var(--accent-contrast);
+        border: none; border-radius: 10px; padding: 10px 12px; cursor: pointer;
+      }
+      .guide-controls .btn-lg.ghost {
+        background: transparent; color: var(--accent); border: 2px solid var(--accent);
+      }
+      .guide-controls .btn-lg:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+    `;
+    shadow.appendChild(guideStyle);
+
+    // Additional styles for AI output (plan rendering and indicators)
+    const aiStyle = document.createElement("style");
+    aiStyle.textContent = `
+      .ai-indicator {
+        display: inline-block; margin-left: 8px; font-weight: 800;
+      }
+      .ai-indicator.ready { color: #2e7d32; }
+      .ai-indicator.missing { color: #b71c1c; }
+
+      .ai-plan {
+        margin-top: 10px; border: 1px dashed var(--border);
+        border-radius: 10px; padding: 10px; background: #fff;
+      }
+      .ai-plan .plan-title { font-weight: 900; margin-bottom: 6px; }
+      .ai-plan .plan-meta { font-weight: 700; opacity: .8; margin-bottom: 8px; }
+      .ai-plan ol { margin: 0 0 10px 18px; }
+      .ai-plan button {
+        font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--accent); color: var(--accent-contrast);
+        border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer;
+      }
+      .ai-plan button:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+    `;
+    shadow.appendChild(aiStyle);
+
+    const fab = document.createElement("button");
+    fab.className = "hermes-fab";
+    fab.type = "button";
+    fab.id = "hermes-fab";
+    fab.textContent = "Guide AI";
+    fab.title = "Open Guide AI";
+    fab.setAttribute("aria-label", "Open Guide AI");
+    fab.setAttribute("aria-expanded", "false");
+    fab.setAttribute("aria-controls", "hermes-panel");
+
+    const panel = document.createElement("div");
+    panel.className = "hermes-panel";
+    panel.id = "hermes-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "false");
+    panel.setAttribute("aria-labelledby", "hermes-title");
+    panel.innerHTML = `
+      <div class="hermes-header">
+        <div id="hermes-title" class="hermes-title">Guide AI</div>
+        <button class="hermes-close" type="button" aria-label="Close panel">Close</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Guide AI Tabs">
+        <button class="tab" role="tab" id="tab-ask" aria-selected="true" aria-controls="panel-ask">Ask AI</button>
+        <button class="tab" role="tab" id="tab-history" aria-selected="false" aria-controls="panel-history">History</button>
+        <button class="tab" role="tab" id="tab-settings" aria-selected="false" aria-controls="panel-settings">Settings</button>
+      </div>
+
+      <section id="panel-ask" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-ask">
+        <div class="off-banner" id="banner-off" hidden>Assistant is turned off. You can enable it in Settings.</div>
+        <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Chat messages"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" type="text" placeholder="Type a question (e.g., How do I find my test results?)" aria-label="Chat input" />
+          <button id="chat-send" type="button" aria-label="Send message">Send</button>
+        </div>
+      </section>
+
+      <section id="panel-history" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-history" hidden>
+        <ul id="history-list" class="history-list" aria-label="Saved guides"></ul>
+      </section>
+
+      <section id="panel-settings" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-settings" hidden>
+        <div class="setting">
+          <label for="setting-text-size">Text size</label>
+          <select id="setting-text-size" aria-label="Text size">
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large" selected>Large</option>
+          </select>
+        </div>
+        <div class="setting">
+          <label for="setting-contrast">High-contrast mode</label>
+          <input id="setting-contrast" type="checkbox" aria-label="High-contrast mode" checked />
+        </div>
+        <div class="setting">
+          <label for="setting-voice">Voice hints</label>
+          <input id="setting-voice" type="checkbox" aria-label="Voice hints" />
+        </div>
+        <div class="setting">
+          <label for="setting-enabled">Turn off assistant (global)</label>
+          <input id="setting-enabled" type="checkbox" aria-label="Turn off assistant globally" />
+        </div>
+        <div class="privacy" role="note" aria-label="Privacy information">
+          Privacy: The assistant sees the current page’s layout to help guide you. It does not read passwords or save secure fields. You can turn it off anytime.
+        </div>
+      </section>
+    `;
+
+    shadow.appendChild(fab);
+    shadow.appendChild(panel);
+
+    const closeBtn = panel.querySelector(".hermes-close");
+
+    function openPanel() {
+      panel.setAttribute("open", "");
+      fab.setAttribute("aria-expanded", "true");
+      // Move focus into panel for accessibility
+      closeBtn?.focus();
+    }
+    function closePanel() {
+      panel.removeAttribute("open");
+      fab.setAttribute("aria-expanded", "false");
+      fab.focus();
+    }
+    function togglePanel() {
+      panel.hasAttribute("open") ? closePanel() : openPanel();
+    }
+
+    fab.addEventListener("click", togglePanel);
+    fab.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePanel(); }
+    });
+    closeBtn?.addEventListener("click", closePanel);
+
+    // Wire global UI controls for messages
+    uiControl.open = openPanel;
+    uiControl.close = closePanel;
+    uiControl.toggle = togglePanel;
+
+    // ===== Settings, Tabs, Chat, and History wiring =====
+    const hostEl = shadow.host;
+
+    // Storage keys
+    const SETTINGS_KEY = "hermes_settings";
+    const HISTORY_KEY = "hermes_history";
+
+    // Defaults designed for older adults: larger text, high contrast on
+    const defaultSettings = {
+      textSize: "large",
+      highContrast: true,
+      voiceHints: false,
+      enabled: true
+    };
+    let settings = { ...defaultSettings };
+
+    // Apply settings to :host attributes and UI
+    function applySettings() {
+      hostEl.setAttribute("data-text-size", settings.textSize);
+      hostEl.setAttribute("data-contrast", settings.highContrast ? "high" : "normal");
+      hostEl.setAttribute("data-enabled", settings.enabled ? "on" : "off");
+
+      // Update FAB label to reflect on/off
+      const base = "Guide AI";
+      fab.textContent = settings.enabled ? base : `${base} (off)`;
+
+      // Banner in Ask tab if disabled
+      const banner = shadow.getElementById("banner-off");
+      if (banner) banner.hidden = !!settings.enabled;
+    }
+    function saveSettings() { try { chrome.storage?.local?.set({ [SETTINGS_KEY]: settings }); } catch {} }
+    async function loadSettings() {
+      try {
+        const got = await chrome.storage?.local?.get(SETTINGS_KEY);
+        if (got && got[SETTINGS_KEY]) settings = { ...defaultSettings, ...got[SETTINGS_KEY] };
+      } catch {}
+      applySettings();
+      // Reflect in controls
+      const sel = shadow.getElementById("setting-text-size");
+      const c1 = shadow.getElementById("setting-contrast");
+      const c2 = shadow.getElementById("setting-voice");
+      const c3 = shadow.getElementById("setting-enabled");
+      if (sel) sel.value = settings.textSize;
+      if (c1) c1.checked = !!settings.highContrast;
+      if (c2) c2.checked = !!settings.voiceHints;
+      if (c3) c3.checked = !settings.enabled; // checkbox means "Turn off" -> true when disabled
+    }
+
+    // Tabs
+    const tabs = Array.from(shadow.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(shadow.querySelectorAll('[role="tabpanel"]'));
+    function activateTab(tabId) {
+      for (const t of tabs) {
+        const sel = t.id === tabId;
+        t.setAttribute("aria-selected", sel ? "true" : "false");
+        const pid = t.getAttribute("aria-controls");
+        const panelEl = pid ? shadow.getElementById(pid) : null;
+        if (panelEl) panelEl.hidden = !sel;
+      }
+      // Move focus to active panel for screen readers
+      const active = tabs.find(t => t.id === tabId);
+      const pid = active?.getAttribute("aria-controls");
+      const panelEl = pid ? shadow.getElementById(pid) : null;
+      panelEl?.focus();
+    }
+    tabs.forEach(t => {
+      t.addEventListener("click", () => activateTab(t.id));
+      t.addEventListener("keydown", (e) => {
+        const i = tabs.indexOf(t);
+        if (e.key === "ArrowRight") { e.preventDefault(); tabs[(i + 1) % tabs.length].focus(); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); tabs[(i - 1 + tabs.length) % tabs.length].focus(); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activateTab(t.id); }
+      });
+    });
+
+    // Chat (mocked, rule-based)
+    const chatLog = shadow.getElementById("chat-log");
+    const chatInput = shadow.getElementById("chat-input");
+    const chatSend = shadow.getElementById("chat-send");
+
+    function appendMsg(role, text) {
+      const row = document.createElement("div");
+      row.className = `msg ${role}`;
+      row.innerHTML = `<span class="role">${role === "user" ? "You" : "Guide AI"}</span><span class="text">${text}</span>`;
+      chatLog?.appendChild(row);
+      chatLog?.scrollTo({ top: chatLog.scrollHeight });
+    }
+
+    function speak(text) {
+      try {
+        if (settings.voiceHints && "speechSynthesis" in window) {
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = 0.9; u.pitch = 1.0;
+          speechSynthesis.speak(u);
+        }
+      } catch {}
+    }
+
+    function botReply(userText) {
+      const t = (userText || "").toLowerCase();
+      let reply =
+        "I can guide common tasks. Try: “Find my test results” or “Download my benefits letter”.";
+      if (/test result|results|lab/i.test(t)) {
+        reply = "Step 1: Look for “Results” or “Test Results” at the top of the page. Step 2: Open your latest result. Step 3: Choose “Download PDF”.";
+      } else if (/benefit|letter|proof/i.test(t)) {
+        reply = "Go to “Benefits”, then “Letters”. Look for “Download” or “Save as PDF”.";
+      } else if (/history/i.test(t)) {
+        reply = "Open the History tab to replay a saved guide.";
+      } else if (/setting|contrast|text|voice/i.test(t)) {
+        reply = "Open Settings to adjust text size, high-contrast mode, or voice hints.";
+      }
+      appendMsg("bot", reply);
+      speak(reply);
+    }
+
+    let aiHasKey = false;
+
+    function onSend() {
+      if (!settings.enabled) {
+        appendMsg("bot", "Assistant is turned off. Enable it in Settings to run guides.");
+        return;
+      }
+      const v = chatInput.value.trim();
+      if (!v) return;
+      appendMsg("user", v);
+      chatInput.value = "";
+      if (aiHasKey) {
+        sendAi(v);
+      } else {
+        setTimeout(() => botReply(v), 200);
+      }
+    }
+    chatSend?.addEventListener("click", onSend);
+    chatInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); onSend(); }
+    });
+
+    // Settings controls wiring
+    shadow.getElementById("setting-text-size")?.addEventListener("change", (e) => {
+      settings.textSize = e.target.value;
+      applySettings(); saveSettings();
+    });
+
+    // Inject AI settings UI into Settings panel
+    (function setupAiSettings() {
+      const settingsPanel = shadow.getElementById("panel-settings");
+      if (!settingsPanel) return;
+      const wrap = document.createElement("div");
+      wrap.innerHTML = `
+        <hr style="margin: 10px 0; border: none; border-top: 1px solid var(--border);" />
+        <div class="setting">
+          <label for="setting-openai-key">OpenAI API key</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="setting-openai-key" type="password" placeholder="sk-..." style="min-width: 180px;" />
+            <button id="setting-save-key" type="button">Save Key</button>
+            <span id="ai-ready-indicator" class="ai-indicator">Checking…</span>
+          </div>
+        </div>
+      `;
+      settingsPanel.appendChild(wrap);
+
+      async function updateAiIndicator() {
+        const ind = shadow.getElementById("ai-ready-indicator");
+        if (!ind) return;
+        ind.textContent = aiHasKey ? "AI is ready" : "AI not configured";
+        ind.classList.toggle("ready", !!aiHasKey);
+        ind.classList.toggle("missing", !aiHasKey);
+      }
+
+      async function checkAiReady() {
+        try {
+          const res = await chrome.runtime.sendMessage({ type: "HERMES_AI_HAS_KEY" });
+          aiHasKey = !!res?.hasKey;
+        } catch { aiHasKey = false; }
+        updateAiIndicator();
+      }
+
+      shadow.getElementById("setting-save-key")?.addEventListener("click", async () => {
+        const inp = shadow.getElementById("setting-openai-key");
+        const key = (inp?.value || "").trim();
+        try {
+          await chrome.runtime.sendMessage({ type: "HERMES_AI_SET_KEY", key });
+          aiHasKey = !!key;
+          updateAiIndicator();
+          if (key) toast("OpenAI API key saved.");
+          if (inp) inp.value = "";
+        } catch (e) {
+          toast("Failed to save API key");
+        }
+      });
+
+      // initial check
+      checkAiReady();
+    })();
+    shadow.getElementById("setting-contrast")?.addEventListener("change", (e) => {
+      settings.highContrast = !!e.target.checked;
+      applySettings(); saveSettings();
+    });
+    shadow.getElementById("setting-voice")?.addEventListener("change", (e) => {
+      settings.voiceHints = !!e.target.checked;
+      saveSettings();
+    });
+    shadow.getElementById("setting-enabled")?.addEventListener("change", (e) => {
+      // Checkbox label: "Turn off assistant" -> checked means disabled
+      const disabled = !!e.target.checked;
+      settings.enabled = !disabled;
+      applySettings(); saveSettings();
+    });
+
+    // Simple AI call using background service worker
+    async function sendAi(userText) {
+      // Build lightweight page context
+      const ctx = {
+        url: location.href,
+        title: document.title,
+        headings: Array.from(document.querySelectorAll("h1,h2,h3")).slice(0, 30).map(n => (n.textContent || "").trim()).filter(Boolean),
+        navLinks: Array.from(document.querySelectorAll("a[href]")).filter(a => isVisible(a)).slice(0, 50).map(a => (a.innerText || a.textContent || "").trim()).filter(Boolean),
+        buttons: Array.from(document.querySelectorAll("button,[role=button],input[type=button],input[type=submit]")).filter(b => isVisible(b)).slice(0, 50).map(b => (b.innerText || b.value || "").trim()).filter(Boolean),
+      };
+      // Placeholder "thinking…" message
+      appendMsg("bot", "Thinking…");
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "HERMES_AI_ASK", userText, context: ctx });
+        if (!res?.ok) {
+          appendMsg("bot", res?.error || "AI request failed.");
+          return;
+        }
+        // Replace last "Thinking…" with real content by just appending result for simplicity
+        const content = res.content || "";
+        appendMsg("bot", content);
+
+        const plan = extractJsonPlan(content);
+        if (plan) {
+          renderPlan(plan);
+        }
+      } catch (e) {
+        appendMsg("bot", "Network error. Please try again.");
+      }
+    }
+
+    function extractJsonPlan(text) {
+      try {
+        const m = text.match(/```json([\s\S]*?)```/i);
+        if (!m) return null;
+        const obj = JSON.parse(m[1]);
+        // Basic shape check
+        if (!obj || typeof obj !== "object" || !Array.isArray(obj.steps)) return null;
+        return obj;
+      } catch {
+        return null;
+      }
+    }
+
+    function renderPlan(plan) {
+      const container = document.createElement("div");
+      container.className = "ai-plan";
+      const conf = typeof plan.confidence === "number" ? (plan.confidence * 100).toFixed(0) + "%" : "n/a";
+      const website = plan.website?.title ? `${plan.website.title}` : (plan.website?.url || "");
+      container.innerHTML = `
+        <div class="plan-title">Plan: ${plan.goal || "Proposed steps"}</div>
+        <div class="plan-meta">${website ? `Website: ${website} • ` : ""}Confidence: ${conf}</div>
+        <ol class="steps"></ol>
+        <button type="button" id="ai-plan-run">Run plan as guide</button>
+      `;
+      const list = container.querySelector(".steps");
+      for (const s of plan.steps || []) {
+        const li = document.createElement("li");
+        const hint = s.selector_hint ? ` (hint: ${s.selector_hint})` : "";
+        li.textContent = `${s.instruction || "Do this"}${hint}`;
+        list.appendChild(li);
+      }
+      panel.querySelector("#panel-ask")?.appendChild(container);
+
+      container.querySelector("#ai-plan-run")?.addEventListener("click", () => {
+        createDynamicGuideFromPlan(plan);
+        uiControl.open();
+      });
+    }
+    // History: seed demo guides and render
+    const defaultHistory = [
+      { id: "demo-1", name: "Find and download your latest test result", description: "Results → Latest → Download PDF.", updatedAt: Date.now() },
+      { id: "demo-2", name: "Download a benefits letter", description: "Benefits → Letters → Download.", updatedAt: Date.now() }
+    ];
+    async function loadHistoryAndRender() {
+      let items = [];
+      try {
+        const got = await chrome.storage?.local?.get(HISTORY_KEY);
+        if (got && Array.isArray(got[HISTORY_KEY])) items = got[HISTORY_KEY];
+      } catch {}
+      if (!items.length) {
+        items = defaultHistory;
+        try { await chrome.storage?.local?.set({ [HISTORY_KEY]: items }); } catch {}
+      }
+      renderHistory(items);
+    }
+    function renderHistory(items) {
+      const ul = shadow.getElementById("history-list");
+      if (!ul) return;
+      ul.innerHTML = "";
+      for (const it of items) {
+        const li = document.createElement("li");
+        li.className = "history-item";
+        li.innerHTML = `
+          <div class="history-title">${it.name}</div>
+          <div class="history-desc">${it.description}</div>
+          <div class="history-actions">
+            <button type="button" data-id="${it.id}">Replay guide</button>
+          </div>
+        `;
+        ul.appendChild(li);
+      }
+      ul.querySelectorAll("button[data-id]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const id = e.currentTarget.getAttribute("data-id");
+          if (!settings.enabled) {
+            appendMsg("bot", "Assistant is turned off. Enable it in Settings to run guides.");
+            activateTab("tab-ask");
+            return;
+          }
+          activateTab("tab-ask");
+          speak("Starting demo guide");
+          startGuide(id);
+        });
+      });
+    }
+
+    // Initial tab and data load
+    activateTab("tab-ask");
+    loadSettings();
+    loadHistoryAndRender();
+
+    // ===== Guide Engine (overlay + breadcrumb + navigation) =====
+    const RUN_KEY = "hermes_running_guide";
+    const DYNAMIC_AI_KEY = "hermes_dynamic_ai_guide";
+    let guides = {
+      "demo-1": {
+        name: "Find and download your latest test result",
+        steps: [
+          { selector: "#nav-results", instruction: "Click on “Results” at the top of the page.", breadcrumb: "Results", urlIncludes: "index.html", scroll: true },
+          { selector: "#latest-result .ghost", instruction: "Open your latest result.", breadcrumb: "Open latest", urlIncludes: "results.html", scroll: true },
+          { selector: "#download-pdf", instruction: "Click “Download PDF”.", breadcrumb: "Download PDF", urlIncludes: "results.html", scroll: true }
+        ]
+      },
+      "demo-2": {
+        name: "Download a benefits letter",
+        steps: [
+          { selector: "#nav-benefits", instruction: "Open “Benefits”. (Demo placeholder)", breadcrumb: "Benefits" }
+        ]
+      }
+    };
+
+    let breadcrumbEl = null;
+    let tooltipEl = null;
+    let controlsEl = null;
+    let tooltipUpdater = null;
+
+    function ensureGuideUI() {
+      if (!breadcrumbEl) {
+        breadcrumbEl = document.createElement("div");
+        breadcrumbEl.className = "guide-breadcrumb";
+        breadcrumbEl.setAttribute("role", "navigation");
+        breadcrumbEl.setAttribute("aria-label", "Guide breadcrumb");
+        shadow.appendChild(breadcrumbEl);
+      }
+      if (!tooltipEl) {
+        tooltipEl = document.createElement("div");
+        tooltipEl.className = "guide-tooltip";
+        tooltipEl.setAttribute("role", "status");
+        tooltipEl.setAttribute("aria-live", "polite");
+        shadow.appendChild(tooltipEl);
+      }
+      if (!controlsEl) {
+        controlsEl = document.createElement("div");
+        controlsEl.className = "guide-controls";
+        controlsEl.innerHTML = `
+          <span class="status" id="guide-status">Step 1 of 1</span>
+          <button type="button" class="btn-lg ghost" id="guide-back" aria-label="Back step">Back</button>
+          <button type="button" class="btn-lg" id="guide-next" aria-label="Next step">Next</button>
+          <button type="button" class="btn-lg ghost" id="guide-exit" aria-label="Exit guide">Exit</button>
+        `;
+        shadow.appendChild(controlsEl);
+        shadow.getElementById("guide-back")?.addEventListener("click", prevStep);
+        shadow.getElementById("guide-next")?.addEventListener("click", nextStep);
+        shadow.getElementById("guide-exit")?.addEventListener("click", stopGuide);
+      }
+    }
+
+    const guideState = { id: null, index: 0, running: false };
+
+    function setUIVisibility(on) {
+      if (!breadcrumbEl || !tooltipEl || !controlsEl) return;
+      breadcrumbEl.toggleAttribute("open", !!on);
+      tooltipEl.toggleAttribute("open", !!on);
+      controlsEl.toggleAttribute("open", !!on);
+    }
+
+    function renderBreadcrumb() {
+      const g = guides[guideState.id];
+      if (!g || !breadcrumbEl) return;
+      const upto = guideState.index;
+      breadcrumbEl.innerHTML = "";
+      for (let i = 0; i <= upto; i++) {
+        const step = g.steps[i];
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "crumb";
+        b.textContent = step.breadcrumb || `Step ${i + 1}`;
+        if (i === upto) b.setAttribute("aria-current", "step");
+        b.addEventListener("click", () => setStep(i));
+        breadcrumbEl.appendChild(b);
+        if (i < upto) {
+          const sep = document.createElement("span");
+          sep.className = "sep";
+          sep.textContent = "→";
+          breadcrumbEl.appendChild(sep);
+        }
+      }
+    }
+
+    function placeTooltipFor(el, text) {
+      if (!tooltipEl) return;
+      tooltipEl.textContent = text || "";
+      let lastEl = el;
+      const update = () => {
+        if (!tooltipEl) return;
+        let left = 20, top = 20;
+        if (lastEl && lastEl.getBoundingClientRect) {
+          const r = rectOf(lastEl);
+          const maxW = Math.min(420, window.innerWidth - 40);
+          left = Math.min(Math.max(r.left, 12), window.innerWidth - maxW - 12);
+          top = Math.min(r.top + r.height + 10, window.innerHeight - 80);
+          tooltipEl.style.maxWidth = `${maxW}px`;
+        }
+        tooltipEl.style.left = `${left}px`;
+        tooltipEl.style.top = `${top}px`;
+      };
+      update();
+      if (tooltipUpdater) {
+        window.removeEventListener("scroll", tooltipUpdater, { capture: false });
+        window.removeEventListener("resize", tooltipUpdater, { capture: false });
+      }
+      tooltipUpdater = () => update();
+      window.addEventListener("scroll", tooltipUpdater, { passive: true });
+      window.addEventListener("resize", tooltipUpdater, { passive: true });
+    }
+
+    function setStatus(text) {
+      const st = shadow.getElementById("guide-status");
+      if (st) st.textContent = text;
+    }
+
+    async function saveRun() {
+      try { await chrome.storage?.local?.set({ [RUN_KEY]: { id: guideState.id, index: guideState.index } }); } catch {}
+    }
+
+    async function clearRun() {
+      try { await chrome.storage?.local?.remove(RUN_KEY); } catch {}
+    }
+
+    function setStep(i) {
+      const g = guides[guideState.id];
+      if (!g) return;
+      guideState.index = Math.max(0, Math.min(i, g.steps.length - 1));
+      showCurrentStep();
+    }
+
+    function showCurrentStep() {
+      const g = guides[guideState.id];
+      if (!g) return;
+      const i = guideState.index;
+      const step = g.steps[i];
+      renderBreadcrumb();
+      setStatus(`Step ${i + 1} of ${g.steps.length}: ${step.instruction}`);
+      clearHighlights();
+
+      let target = null;
+      try {
+        if (step.selector) target = document.querySelector(step.selector);
+      } catch {}
+      if (!target && step.textHint) {
+        try { target = findByVisibleText(step.textHint, document); } catch {}
+      }
+      if (target && isVisible(target)) {
+        if (step.scroll) target.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Keep highlight visible for long enough; we'll clear on navigation/stop or next step
+        drawRingAround(target, { label: "", circle: false, ttlMs: 600000 });
+        placeTooltipFor(target, step.instruction);
+      } else {
+        // Fallback: show tooltip near top-left with instruction
+        placeTooltipFor(null, step.instruction);
+      }
+      saveRun();
+      if (settings.voiceHints) speak(step.instruction);
+    }
+
+    function nextStep() {
+      const g = guides[guideState.id];
+      if (!g) return;
+      if (guideState.index + 1 < g.steps.length) {
+        guideState.index += 1;
+        showCurrentStep();
+      } else {
+        appendMsg("bot", "Guide complete.");
+        stopGuide();
+      }
+    }
+
+    function prevStep() {
+      if (guideState.index > 0) {
+        guideState.index -= 1;
+        showCurrentStep();
+      }
+    }
+
+    function stopGuide() {
+      guideState.id = null;
+      guideState.index = 0;
+      guideState.running = false;
+      setUIVisibility(false);
+      clearHighlights();
+      clearRun();
+    }
+
+    let dynamicGuideSteps = null;
+
+    function startGuide(id) {
+      if (!guides[id]) {
+        appendMsg("bot", "Guide not found in this prototype.");
+        return;
+      }
+      if (!settings.enabled) {
+        appendMsg("bot", "Assistant is turned off. Enable it in Settings to run guides.");
+        return;
+      }
+      ensureGuideUI();
+      guideState.id = id;
+      guideState.index = 0;
+      guideState.running = true;
+      setUIVisibility(true);
+      // Persist dynamic AI guide steps if needed
+      if (id === "ai-plan" && Array.isArray(dynamicGuideSteps) && dynamicGuideSteps.length) {
+        try { chrome.storage?.local?.set({ [DYNAMIC_AI_KEY]: dynamicGuideSteps }); } catch {}
+      }
+      showCurrentStep();
+    }
+
+    async function resumeRunningGuide() {
+      try {
+        const got = await chrome.storage?.local?.get(RUN_KEY);
+        const run = got ? got[RUN_KEY] : null;
+        if (run && run.id) {
+          // If resuming AI dynamic guide, reconstruct it
+          if (run.id === "ai-plan" && !guides["ai-plan"]) {
+            try {
+              const dyn = await chrome.storage?.local?.get(DYNAMIC_AI_KEY);
+              const steps = dyn?.[DYNAMIC_AI_KEY];
+              if (Array.isArray(steps) && steps.length) {
+                guides["ai-plan"] = { name: "AI Plan", steps };
+              }
+            } catch {}
+          }
+          if (guides[run.id]) {
+            ensureGuideUI();
+            guideState.id = run.id;
+            guideState.index = run.index || 0;
+            guideState.running = true;
+            setUIVisibility(true);
+            showCurrentStep();
+          }
+        }
+      } catch {}
+    }
+
+    // Resume if a guide was active on previous page (e.g., after navigating to Results)
+    resumeRunningGuide();
+
+    function createDynamicGuideFromPlan(plan) {
+      const steps = [];
+      for (const s of plan.steps || []) {
+        const instruction = s.instruction || "Follow this step";
+        const hint = s.selector_hint || "";
+        // Heuristic: treat #,.,[ as CSS selectors, otherwise as visible text hint
+        if (/^[#.\[]/.test(hint) || /\s/.test("") ) {
+          steps.push({ selector: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+        } else if (hint) {
+          steps.push({ textHint: hint, instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+        } else {
+          steps.push({ instruction, breadcrumb: instruction.split(".")[0] || "Step", scroll: true });
+        }
+      }
+      dynamicGuideSteps = steps;
+      guides["ai-plan"] = { name: plan.goal || "AI Plan", steps };
+      startGuide("ai-plan");
+    }
+
+    shadow.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && panel.hasAttribute("open")) {
+        e.preventDefault();
+        closePanel();
+      }
+      if (guideState.running) {
+        if (e.key === "ArrowRight") { e.preventDefault(); nextStep(); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); prevStep(); }
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAssistantUI);
+  if (document.readyState === "complete" || document.readyState === "interactive") initAssistantUI();
+
   })();
