@@ -367,7 +367,7 @@
       .hermes-panel {
         position: fixed; right: 20px; bottom: 76px;
         width: 380px; max-width: calc(100vw - 40px);
-        max-height: calc(100vh - 120px);
+        max-height: calc(100vh - 128px);
         overflow: auto;
         pointer-events: auto;
         background: var(--bg); color: var(--fg);
@@ -428,7 +428,7 @@
 
       /* Chat */
       .chat-log {
-        height: 220px; overflow: auto; border: 1px solid var(--border);
+        height: 300px; overflow: auto; border: 1px solid var(--border);
         border-radius: 12px; padding: 12px; background: #f8fafc;
       }
       .msg { margin: 10px 0; display: flex; flex-direction: column; }
@@ -607,6 +607,8 @@
         background: transparent; color: var(--accent); border: 2px solid var(--accent);
       }
       .guide-controls .btn-lg:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+      /* Distinguish Play button */
+      .guide-controls #guide-play { background: #06b6d4; color: var(--accent-contrast); border: none; }
     `;
     shadow.appendChild(guideStyle);
 
@@ -640,8 +642,8 @@
     fab.type = "button";
     fab.id = "hermes-fab";
     fab.textContent = "?";
-    fab.title = "Open Guide AI";
-    fab.setAttribute("aria-label", "Open Guide AI");
+    fab.title = "Open AI Breadcrumb Guide";
+    fab.setAttribute("aria-label", "Open AI Breadcrumb Guide");
     fab.setAttribute("aria-expanded", "false");
     fab.setAttribute("aria-controls", "hermes-panel");
 
@@ -653,14 +655,14 @@
     panel.setAttribute("aria-labelledby", "hermes-title");
     panel.innerHTML = `
       <div class="hermes-header">
-        <div id="hermes-title" class="hermes-title">Guide AI</div>
+        <div id="hermes-title" class="hermes-title">AI Breadcrumb Guide</div>
         <div class="header-actions">
           <button class="hermes-gear icon-btn" type="button" aria-label="Open settings" title="Settings">⚙</button>
           <button class="hermes-close icon-btn" type="button" aria-label="Close panel" title="Close">✕</button>
         </div>
       </div>
 
-      <div class="tabs" role="tablist" aria-label="Guide AI Tabs">
+      <div class="tabs" role="tablist" aria-label="AI Breadcrumb Guide Tabs">
         <button class="tab" role="tab" id="tab-ask" aria-selected="true" aria-controls="panel-ask">Ask AI</button>
         <button class="tab" role="tab" id="tab-history" aria-selected="false" aria-controls="panel-history">History</button>
       </div>
@@ -784,6 +786,13 @@
 
       // Update FAB symbol (always "?")
       fab.textContent = "?";
+
+      // Show/hide FAB based on global enabled state
+      fab.style.display = settings.enabled ? "" : "none";
+      if (!settings.enabled) {
+        panel.removeAttribute("open");
+        fab.setAttribute("aria-expanded", "false");
+      }
 
       // Banner in Ask tab if disabled or this site is restricted
       const banner = shadow.getElementById("banner-off");
@@ -1161,15 +1170,13 @@
         const { message, plan } = splitAiContent(content);
         // Build a neatly formatted bot response (instructions inside the chat bubble)
         let rich = "";
-        if (message && message.trim().length) {
-          rich += `<div class="text">${escapeHTML(message.trim())}</div>`;
-        }
         if (plan && Array.isArray(plan.steps) && plan.steps.length) {
           const steps = plan.steps.map((s, i) => `<li>${escapeHTML(s.instruction || `Step ${i + 1}`)}</li>`).join("");
           const goal = escapeHTML(plan.goal || "Proposed steps");
-          rich += `<div class="card"><div class="title">${goal}</div><ol>${steps}</ol></div>`;
-        }
-        if (!rich) {
+          rich = `<div class="card"><div class="title">${goal}</div><ol>${steps}</ol></div>`;
+        } else if (message && message.trim().length) {
+          rich = `<div class="text">${escapeHTML(message.trim())}</div>`;
+        } else {
           rich = `<div class="text">${escapeHTML("I created steps for you below.")}</div>`;
         }
         appendBotRich(rich);
@@ -1282,6 +1289,16 @@
     loadSettings();
     loadHistoryAndRender();
 
+    // Reflect live changes from popup/settings to content UI (e.g., enable/disable FAB)
+    chrome.storage?.onChanged?.addListener((changes, area) => {
+      if (area === "local" && changes[SETTINGS_KEY]) {
+        const nv = changes[SETTINGS_KEY].newValue || {};
+        settings = { ...defaultSettings, ...nv };
+        applySettings();
+        renderRestrictedList();
+      }
+    });
+
     // ===== Guide Engine (overlay + breadcrumb + navigation) =====
     const RUN_KEY = "hermes_running_guide";
     const DYNAMIC_AI_KEY = "hermes_dynamic_ai_guide";
@@ -1327,7 +1344,7 @@
         controlsEl.className = "guide-controls";
         controlsEl.innerHTML = `
           <span class="status" id="guide-status">Step 1 of 1</span>
-          <button type="button" class="btn-lg ghost" id="guide-back" aria-label="Back step">Back</button>
+          <button type="button" class="btn-lg" id="guide-back" aria-label="Back step">Back</button>
           <button type="button" class="btn-lg" id="guide-play" aria-label="Play step">Play</button>
           <button type="button" class="btn-lg" id="guide-next" aria-label="Next step">Next</button>
           <button type="button" class="btn-lg ghost" id="guide-exit" aria-label="Exit guide">Exit</button>

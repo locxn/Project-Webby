@@ -1,35 +1,51 @@
-const MSG = {
-    HIGHLIGHT_SIGN_IN: "HERMES_HIGHLIGHT_SIGN_IN",
-    HIGHLIGHT_BY_TEXT: "HERMES_HIGHLIGHT_BY_TEXT",
-    CLEAR_HIGHLIGHTS: "HERMES_CLEAR_HIGHLIGHTS",
-    OPEN_PANEL: "HERMES_OPEN_PANEL",
-    TOGGLE_PANEL: "HERMES_TOGGLE_PANEL",
-    AI_HAS_KEY: "HERMES_AI_HAS_KEY"
-  };
-  async function sendToActiveTab(message) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) await chrome.tabs.sendMessage(tab.id, message);
-  }
-  document.getElementById("btn-signin").addEventListener("click", () => sendToActiveTab({ type: MSG.HIGHLIGHT_SIGN_IN }));
-  document.getElementById("btn-by-text").addEventListener("click", () => {
-    const text = document.getElementById("by-text").value.trim();
-    if (text) sendToActiveTab({ type: MSG.HIGHLIGHT_BY_TEXT, text });
-  });
-  document.getElementById("btn-clear").addEventListener("click", () => sendToActiveTab({ type: MSG.CLEAR_HIGHLIGHTS }));
-  document.getElementById("btn-open-panel")?.addEventListener("click", () => sendToActiveTab({ type: MSG.OPEN_PANEL }));
+// Popup: simple enable/disable toggle for the on-page “?” FAB (AI Breadcrumb Guide)
 
-  // AI readiness indicator (shows if an OpenAI key is configured in background)
-  (async function showAiStatus() {
-    const el = document.getElementById("ai-ready");
-    if (!el) return;
-    el.textContent = "AI status: checking…";
-    try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.AI_HAS_KEY });
-      const ready = !!res?.hasKey;
-      el.textContent = ready ? "AI status: ready" : "AI status: not configured";
-      el.style.color = ready ? "#2e7d32" : "#b71c1c";
-    } catch (e) {
-      el.textContent = "AI status: error";
-      el.style.color = "#b71c1c";
-    }
-  })();
+const SETTINGS_KEY = "hermes_settings";
+const defaultSettings = {
+  textSize: "large",
+  highContrast: true,
+  voiceHints: false,
+  enabled: true,
+  theme: "violet",
+  micEnabled: false,
+  restrictedSites: []
+};
+
+async function loadSettings() {
+  try {
+    const got = await chrome.storage.local.get(SETTINGS_KEY);
+    const s = got?.[SETTINGS_KEY];
+    if (s && typeof s === "object") return { ...defaultSettings, ...s };
+  } catch {}
+  return { ...defaultSettings };
+}
+
+async function saveSettings(settings) {
+  try {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  } catch (e) {
+    console.warn("Failed to save settings:", e);
+  }
+}
+
+function renderStatus(enabled) {
+  const status = document.getElementById("status");
+  const btn = document.getElementById("toggle");
+  if (status) {
+    status.textContent = `Status: ${enabled ? "enabled" : "disabled"}`;
+    status.style.color = enabled ? "#2e7d32" : "#b71c1c";
+  }
+  if (btn) btn.textContent = enabled ? "Disable" : "Enable";
+}
+
+(async function init() {
+  let settings = await loadSettings();
+  renderStatus(!!settings.enabled);
+
+  document.getElementById("toggle")?.addEventListener("click", async () => {
+    settings.enabled = !settings.enabled;
+    await saveSettings(settings);
+    // content.js listens to chrome.storage.onChanged and will show/hide FAB accordingly
+    renderStatus(!!settings.enabled);
+  });
+})();
