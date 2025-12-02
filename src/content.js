@@ -155,10 +155,10 @@
         top: `${r.top - pad}px`, 
         width: `${r.width + pad * 2}px`, 
         height: `${r.height + pad * 2}px`,
-        border: "3px solid #ff3b30", 
-        boxShadow: "0 0 12px rgba(0,0,0,.35)", 
-        background: "rgba(255,59,48,0.08)", 
-        borderRadius: circle ? "9999px" : "12px", 
+        border: "3px solid #5b47ff", 
+        boxShadow: "0 6px 14px rgba(91,71,255,.35)", 
+        background: "rgba(91,71,255,0.08)", 
+        borderRadius: circle ? "9999px" : "14px", 
         pointerEvents: "none"
       });
       root.appendChild(ring); 
@@ -313,13 +313,26 @@
 
       /* Design tokens and accessibility variables */
       :host {
+        /* Core palette */
         --bg: #ffffff;
-        --fg: #111111;
-        --accent: #1a73e8;
+        --fg: #0f172a;
+        --accent: #5b47ff;            /* primary */
         --accent-contrast: #ffffff;
-        --border: #0002;
-        --shadow: 0 8px 24px rgba(0,0,0,.2);
+        --muted: #eef2ff;
+        --subtext: #6b7280;
+
+        /* Surfaces */
+        --surface: #ffffff;
+        --border: #00000022;
+        --shadow: 0 10px 28px rgba(17,24,39,.22);
+
+        /* Gradients */
+        --header-gradient: linear-gradient(45deg, #5b47ff, #a855f7, #f97316);
+
+        /* A11y */
         --focus: #ffd54f;
+
+        /* Type scale */
         --fs: 18px;
       }
       :host([data-text-size="small"]) { --fs: 14px; }
@@ -339,14 +352,16 @@
       .hermes-fab {
         position: fixed; right: 20px; bottom: 20px;
         pointer-events: auto;
-        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        color: var(--accent-contrast);
-        background: var(--accent);
-        border: none; border-radius: 999px;
-        padding: 14px 18px;
-        box-shadow: 0 4px 12px rgba(0,0,0,.25);
+        width: 56px; height: 56px;
+        border-radius: 999px; border: none;
+        background: radial-gradient(120% 120% at 30% 20%, #7c6bff 0%, #5b47ff 45%, #7c3aed 100%);
+        color: #fff;
+        font: 800 24px/56px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        text-align: center;
+        box-shadow: 0 10px 28px rgba(17,24,39,.28);
         cursor: pointer;
       }
+      .hermes-fab:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
       .hermes-fab:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 
       .hermes-panel {
@@ -364,27 +379,48 @@
 
       .hermes-header {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 12px 14px; border-bottom: 1px solid var(--border);
+        padding: 14px 14px;
+        background: var(--header-gradient);
+        color: #fff;
+        border-top-left-radius: 12px; border-top-right-radius: 12px;
       }
       .hermes-title {
         font: 800 calc(var(--fs) + 2px)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       }
-      .hermes-close {
-        font: 700 calc(var(--fs) - 2px)/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: transparent; border: 2px solid transparent; color: var(--accent); cursor: pointer;
-        padding: 6px 8px; border-radius: 6px;
+      .icon-btn {
+        width: 32px; height: 32px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(255,255,255,.18);
+        color: #fff;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        font: 900 16px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,.18) inset;
       }
-      .hermes-close:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .icon-btn:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-      /* Tabs */
-      .tabs { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-      .tab {
-        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: transparent; color: var(--fg);
-        border-radius: 8px; border: 2px solid transparent;
-        padding: 8px 10px; cursor: pointer;
+      /* Buttons use class="icon-btn" already; gear just adds spacing */
+      .hermes-close {}
+      .hermes-gear { margin-right: 8px; width: 36px; height: 36px; font-size: 18px; }
+
+      /* Tabs (segmented) */
+      .tabs {
+        display: flex; gap: 6px; padding: 12px;
+        background: #ffffff;
+        border-bottom: 1px solid var(--border);
       }
-      .tab[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+      .tab {
+        font: 800 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #f4f5ff; color: var(--fg);
+        border-radius: 999px; border: 2px solid transparent;
+        padding: 8px 14px; cursor: pointer;
+      }
+      .tab[aria-selected="true"] {
+        background: #e9e8ff;
+        border-color: var(--accent);
+        color: var(--accent);
+      }
       .tab:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 
       .panel { padding: 12px; font: 600 var(--fs)/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
@@ -393,27 +429,73 @@
       /* Chat */
       .chat-log {
         height: 220px; overflow: auto; border: 1px solid var(--border);
-        border-radius: 10px; padding: 10px; background: #fafafa;
+        border-radius: 12px; padding: 12px; background: #f8fafc;
       }
-      .msg { margin: 8px 0; }
-      .msg .role { font-weight: 800; margin-right: 6px; }
-      .msg.user .role { color: var(--accent); }
-      .msg.bot .role { color: #2e7d32; }
+      .msg { margin: 10px 0; display: flex; flex-direction: column; }
+      .msg.user { align-items: flex-end; }
+      .msg.bot { align-items: flex-start; }
+      .bubble {
+        max-width: 80%;
+        padding: 10px 12px;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        word-wrap: break-word;
+      }
+      .msg.user .bubble { background: var(--accent); color: var(--accent-contrast); border-top-right-radius: 4px; }
+      .msg.bot .bubble { background: #eef3ff; color: var(--fg); border-top-left-radius: 4px; border: 1px solid #00000012; }
+      .timestamp {
+        margin-top: 4px; font: 700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--subtext); opacity: .85;
+      }
+
+      /* Typing indicator */
+      .typing { display: inline-flex; gap: 4px; }
+      .typing .dot {
+        width: 6px; height: 6px; border-radius: 999px;
+        background: #9aa5ff; animation: bounce 1s infinite ease-in-out;
+      }
+      .typing .dot:nth-child(2) { animation-delay: .15s; }
+      .typing .dot:nth-child(3) { animation-delay: .30s; }
+      @keyframes bounce {
+        0%, 80%, 100% { transform: translateY(0); opacity: .5; }
+        40% { transform: translateY(-4px); opacity: 1; }
+      }
+
       .chat-input-row {
-        margin-top: 10px; display: flex; gap: 8px;
+        margin-top: 12px; display: flex; gap: 8px;
       }
       .chat-input-row input[type="text"] {
         flex: 1; font: 600 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+        padding: 12px 14px; border-radius: 999px; border: 1px solid var(--border);
+        background: #fff;
       }
       .chat-input-row button {
-        font: 700 var(--fs)/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        width: 48px; height: 48px;
+        font: 900 18px/48px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         background: var(--accent); color: var(--accent-contrast);
-        border: none; border-radius: 8px; padding: 10px 12px; cursor: pointer;
+        border: none; border-radius: 999px; cursor: pointer;
+        box-shadow: 0 6px 16px rgba(17,24,39,.18);
       }
       .chat-input-row button:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 
+      /* Rich bubble formatting (response rendered like a card) */
+      .bubble .text { white-space: pre-wrap; }
+      .bubble .card {
+        border: 1px dashed var(--border);
+        background: #fff;
+        border-radius: 10px;
+        padding: 10px;
+        margin-top: 8px;
+      }
+      .bubble .card .title { font-weight: 900; margin-bottom: 6px; }
+      .bubble .card ol { margin: 0 0 10px 18px; }
+
       /* History */
+      .history-intro { 
+        font: 700 calc(var(--fs) - 2px)/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
+        color: var(--subtext); 
+        margin: 4px 0 10px; 
+      }
       .history-list { list-style: none; padding: 0; margin: 0; }
       .history-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin: 8px 0; background: #fff; }
       .history-title { font-weight: 800; margin-bottom: 4px; }
@@ -429,6 +511,33 @@
       .setting label { font-weight: 800; }
       .setting input[type="checkbox"], .setting select { transform: scale(1.2); }
       .privacy { margin-top: 10px; font-weight: 600; }
+
+      /* Settings theming + chips (visual parity with Figma) */
+      .settings-section { margin: 12px 0; }
+      .settings-title { font: 900 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin-bottom: 6px; }
+      .swatches { display: flex; gap: 10px; }
+      .swatch {
+        width: 28px; height: 28px; border-radius: 999px; border: 2px solid #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer;
+      }
+      .swatch[data-theme="violet"] { background: #5b47ff; }
+      .swatch[data-theme="orange"] { background: #f97316; }
+      .swatch[data-theme="green"]  { background: #16a34a; }
+      .swatch[data-theme="cyan"]   { background: #06b6d4; }
+      .swatch[data-theme="gradient"] { background: linear-gradient(45deg,#5b47ff,#a855f7,#f97316); }
+      .swatch[aria-selected="true"] { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #fff; border: 1px solid var(--border); border-radius: 999px;
+        padding: 6px 10px; box-shadow: 0 2px 6px rgba(0,0,0,.06);
+        font: 700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .chip button {
+        border: none; background: transparent; color: var(--subtext);
+        cursor: pointer; font: 900 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
 
       /* Enabled OFF banner */
       .off-banner {
@@ -450,8 +559,21 @@
         font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       }
       .guide-breadcrumb[open] { display: inline-flex; flex-wrap: wrap; }
-      .guide-breadcrumb .crumb { cursor: pointer; color: var(--accent); }
-      .guide-breadcrumb .crumb[aria-current="step"] { color: var(--fg); cursor: default; text-decoration: underline; }
+      .guide-breadcrumb .crumb { 
+        cursor: pointer; 
+        color: var(--accent); 
+        background: #f4f5ff; 
+        border: 1px solid var(--border); 
+        border-radius: 999px; 
+        padding: 6px 10px; 
+      }
+      .guide-breadcrumb .crumb[aria-current="step"] { 
+        color: var(--accent-contrast); 
+        background: var(--accent); 
+        border-color: var(--accent);
+        cursor: default; 
+        text-decoration: none; 
+      }
       .guide-breadcrumb .sep { opacity: .6; padding: 0 4px; }
 
       .guide-tooltip {
@@ -478,7 +600,8 @@
       .guide-controls .btn-lg {
         font: 800 calc(var(--fs)) /1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         background: var(--accent); color: var(--accent-contrast);
-        border: none; border-radius: 10px; padding: 10px 12px; cursor: pointer;
+        border: none; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+        box-shadow: 0 6px 16px rgba(17,24,39,.18);
       }
       .guide-controls .btn-lg.ghost {
         background: transparent; color: var(--accent); border: 2px solid var(--accent);
@@ -516,7 +639,7 @@
     fab.className = "hermes-fab";
     fab.type = "button";
     fab.id = "hermes-fab";
-    fab.textContent = "Guide AI";
+    fab.textContent = "?";
     fab.title = "Open Guide AI";
     fab.setAttribute("aria-label", "Open Guide AI");
     fab.setAttribute("aria-expanded", "false");
@@ -531,25 +654,28 @@
     panel.innerHTML = `
       <div class="hermes-header">
         <div id="hermes-title" class="hermes-title">Guide AI</div>
-        <button class="hermes-close" type="button" aria-label="Close panel">Close</button>
+        <div class="header-actions">
+          <button class="hermes-gear icon-btn" type="button" aria-label="Open settings" title="Settings">⚙</button>
+          <button class="hermes-close icon-btn" type="button" aria-label="Close panel" title="Close">✕</button>
+        </div>
       </div>
 
       <div class="tabs" role="tablist" aria-label="Guide AI Tabs">
         <button class="tab" role="tab" id="tab-ask" aria-selected="true" aria-controls="panel-ask">Ask AI</button>
         <button class="tab" role="tab" id="tab-history" aria-selected="false" aria-controls="panel-history">History</button>
-        <button class="tab" role="tab" id="tab-settings" aria-selected="false" aria-controls="panel-settings">Settings</button>
       </div>
 
       <section id="panel-ask" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-ask">
         <div class="off-banner" id="banner-off" hidden>Assistant is turned off. You can enable it in Settings.</div>
         <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Chat messages"></div>
         <div class="chat-input-row">
-          <input id="chat-input" type="text" placeholder="Type a question (e.g., How do I find my test results?)" aria-label="Chat input" />
-          <button id="chat-send" type="button" aria-label="Send message">Send</button>
+          <input id="chat-input" type="text" placeholder="Ask where to go…" aria-label="Chat input" />
+          <button id="chat-send" type="button" aria-label="Send message">➤</button>
         </div>
       </section>
 
       <section id="panel-history" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-history" hidden>
+        <p class="history-intro">Welcome to the history page! Here you can find your recent trails. Select Start to begin.</p>
         <ul id="history-list" class="history-list" aria-label="Saved guides"></ul>
       </section>
 
@@ -584,6 +710,7 @@
     shadow.appendChild(panel);
 
     const closeBtn = panel.querySelector(".hermes-close");
+    const gearBtn = panel.querySelector(".hermes-gear");
 
     function openPanel() {
       panel.setAttribute("open", "");
@@ -605,6 +732,20 @@
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePanel(); }
     });
     closeBtn?.addEventListener("click", closePanel);
+    gearBtn?.addEventListener("click", () => {
+      // Open Settings via the gear icon (no Settings tab in the segmented control)
+      const ask = shadow.getElementById("panel-ask");
+      const hist = shadow.getElementById("panel-history");
+      const settings = shadow.getElementById("panel-settings");
+      // deselect any current tabs
+      tabs.forEach(t => t.setAttribute("aria-selected", "false"));
+      if (ask) ask.hidden = true;
+      if (hist) hist.hidden = true;
+      if (settings) {
+        settings.hidden = false;
+        settings.focus();
+      }
+    });
 
     // Wire global UI controls for messages
     uiControl.open = openPanel;
@@ -613,6 +754,7 @@
 
     // ===== Settings, Tabs, Chat, and History wiring =====
     const hostEl = shadow.host;
+    let renderRestrictedList = () => {};
 
     // Storage keys
     const SETTINGS_KEY = "hermes_settings";
@@ -623,7 +765,10 @@
       textSize: "large",
       highContrast: true,
       voiceHints: false,
-      enabled: true
+      enabled: true,
+      theme: "violet",
+      micEnabled: false,
+      restrictedSites: []
     };
     let settings = { ...defaultSettings };
 
@@ -632,14 +777,23 @@
       hostEl.setAttribute("data-text-size", settings.textSize);
       hostEl.setAttribute("data-contrast", settings.highContrast ? "high" : "normal");
       hostEl.setAttribute("data-enabled", settings.enabled ? "on" : "off");
+      hostEl.setAttribute("data-theme", settings.theme || "violet");
 
-      // Update FAB label to reflect on/off
-      const base = "Guide AI";
-      fab.textContent = settings.enabled ? base : `${base} (off)`;
+      // Theme tokens based on selected theme
+      applyTheme(settings.theme || "violet");
 
-      // Banner in Ask tab if disabled
+      // Update FAB symbol (always "?")
+      fab.textContent = "?";
+
+      // Banner in Ask tab if disabled or this site is restricted
       const banner = shadow.getElementById("banner-off");
-      if (banner) banner.hidden = !!settings.enabled;
+      if (banner) {
+        const restricted = isSiteRestricted();
+        banner.textContent = (!settings.enabled)
+          ? "Assistant is turned off. You can enable it in Settings."
+          : (restricted ? "Assistant is turned off on this site. Update Restrictions in Settings." : "");
+        banner.hidden = settings.enabled && !restricted;
+      }
     }
     function saveSettings() { try { chrome.storage?.local?.set({ [SETTINGS_KEY]: settings }); } catch {} }
     async function loadSettings() {
@@ -657,18 +811,57 @@
       if (c1) c1.checked = !!settings.highContrast;
       if (c2) c2.checked = !!settings.voiceHints;
       if (c3) c3.checked = !settings.enabled; // checkbox means "Turn off" -> true when disabled
+
+      // Mirror into Theme & Privacy UI if present
+      const mic = shadow.getElementById("setting-mic");
+      if (mic) mic.checked = !!settings.micEnabled;
+      shadow.querySelectorAll(".swatch").forEach(sw => {
+        sw.setAttribute("aria-selected", sw.getAttribute("data-theme") === (settings.theme || "violet") ? "true" : "false");
+      });
+      renderRestrictedList();
+    }
+
+    // Helpers
+    function isSiteRestricted() {
+      try {
+        const origin = location.origin;
+        const sites = Array.isArray(settings.restrictedSites) ? settings.restrictedSites : [];
+        return sites.some(s => {
+          const t = (s || "").toString().trim();
+          if (!t) return false;
+          // treat entries as host or substring match
+          return origin.includes(t) || location.hostname.includes(t);
+        });
+      } catch { return false; }
+    }
+    function canRunAssistant() {
+      return !!settings.enabled && !isSiteRestricted();
+    }
+    function applyTheme(name) {
+      const t = (name || "violet").toLowerCase();
+      let acc = "#5b47ff";
+      let grad = "linear-gradient(45deg, #5b47ff, #a855f7, #f97316)";
+      if (t === "orange") { acc = "#f97316"; grad = "linear-gradient(45deg,#fb923c,#f97316,#f59e0b)"; }
+      if (t === "green")  { acc = "#16a34a"; grad = "linear-gradient(45deg,#34d399,#16a34a,#22c55e)"; }
+      if (t === "cyan")   { acc = "#06b6d4"; grad = "linear-gradient(45deg,#67e8f9,#06b6d4,#22d3ee)"; }
+      if (t === "gradient") { acc = "#5b47ff"; grad = "linear-gradient(45deg, #5b47ff, #a855f7, #f97316)"; }
+      hostEl.style.setProperty("--accent", acc);
+      hostEl.style.setProperty("--header-gradient", grad);
     }
 
     // Tabs
     const tabs = Array.from(shadow.querySelectorAll('[role="tab"]'));
     const panels = Array.from(shadow.querySelectorAll('[role="tabpanel"]'));
     function activateTab(tabId) {
+      // Hide all panels first (Ask, History, Settings, etc.)
+      panels.forEach(p => { p.hidden = true; });
+
       for (const t of tabs) {
         const sel = t.id === tabId;
         t.setAttribute("aria-selected", sel ? "true" : "false");
         const pid = t.getAttribute("aria-controls");
         const panelEl = pid ? shadow.getElementById(pid) : null;
-        if (panelEl) panelEl.hidden = !sel;
+        if (panelEl && sel) panelEl.hidden = false;
       }
       // Move focus to active panel for screen readers
       const active = tabs.find(t => t.id === tabId);
@@ -691,10 +884,42 @@
     const chatInput = shadow.getElementById("chat-input");
     const chatSend = shadow.getElementById("chat-send");
 
+    function formatTime(d) {
+      try { return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return ""; }
+    }
+
+    let typingRow = null;
+    function showTypingIndicator() {
+      if (!chatLog) return;
+      typingRow = document.createElement("div");
+      typingRow.className = "msg bot";
+      typingRow.innerHTML = `<div class="bubble"><span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>`;
+      chatLog.appendChild(typingRow);
+      chatLog.scrollTo({ top: chatLog.scrollHeight });
+    }
+    function hideTypingIndicator() {
+      if (typingRow) { typingRow.remove(); typingRow = null; }
+    }
+
     function appendMsg(role, text) {
       const row = document.createElement("div");
       row.className = `msg ${role}`;
-      row.innerHTML = `<span class="role">${role === "user" ? "You" : "Guide AI"}</span><span class="text">${text}</span>`;
+      const safe = String(text || "");
+      row.innerHTML = `<div class="bubble">${safe}</div><div class="timestamp">${formatTime(new Date())}</div>`;
+      chatLog?.appendChild(row);
+      chatLog?.scrollTo({ top: chatLog.scrollHeight });
+    }
+
+    function escapeHTML(s) {
+      const div = document.createElement("div");
+      div.textContent = s == null ? "" : String(s);
+      return div.innerHTML;
+    }
+
+    function appendBotRich(html) {
+      const row = document.createElement("div");
+      row.className = "msg bot";
+      row.innerHTML = `<div class="bubble">${html || ""}</div><div class="timestamp">${formatTime(new Date())}</div>`;
       chatLog?.appendChild(row);
       chatLog?.scrollTo({ top: chatLog.scrollHeight });
     }
@@ -729,8 +954,8 @@
     let aiHasKey = false;
 
     function onSend() {
-      if (!settings.enabled) {
-        appendMsg("bot", "Assistant is turned off. Enable it in Settings to run guides.");
+      if (!canRunAssistant()) {
+        appendMsg("bot", "Assistant is turned off for this site. Update Settings to run guides.");
         return;
       }
       const v = chatInput.value.trim();
@@ -753,6 +978,99 @@
       settings.textSize = e.target.value;
       applySettings(); saveSettings();
     });
+
+    // Theme + Privacy (visual parity; immediate-save UX)
+    function setupThemeAndPrivacy() {
+      const settingsPanel = shadow.getElementById("panel-settings");
+      if (!settingsPanel) return;
+
+      const wrap = document.createElement("div");
+      wrap.className = "settings-section";
+      wrap.innerHTML = `
+        <div class="settings-section">
+          <div class="settings-title">Theme</div>
+          <div class="swatches" id="theme-swatches" role="radiogroup" aria-label="Theme">
+            <button class="swatch" role="radio" aria-label="Violet" data-theme="violet" aria-selected="false"></button>
+            <button class="swatch" role="radio" aria-label="Orange" data-theme="orange" aria-selected="false"></button>
+            <button class="swatch" role="radio" aria-label="Green" data-theme="green" aria-selected="false"></button>
+            <button class="swatch" role="radio" aria-label="Cyan" data-theme="cyan" aria-selected="false"></button>
+            <button class="swatch" role="radio" aria-label="Gradient" data-theme="gradient" aria-selected="false"></button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-title">Privacy & Restrictions</div>
+          <div class="setting" style="justify-content: flex-start; gap: 12px;">
+            <label for="setting-mic" style="min-width:200px;">Enable Microphone Access</label>
+            <input id="setting-mic" type="checkbox" aria-label="Enable Microphone Access" />
+          </div>
+          <div style="border:1px solid var(--border); border-radius:10px; padding:10px; background:#fff;">
+            <div style="display:flex; align-items:center; gap:8px; font-weight:800; margin-bottom:8px;">
+              <span aria-hidden="true">ⓘ</span> Restricted Websites List
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <input id="restrict-input" placeholder="www.example.com" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px;" />
+              <button id="restrict-add" type="button" style="background:var(--accent); color:var(--accent-contrast); border:none; border-radius:8px; padding:8px 10px;">Add</button>
+            </div>
+            <div id="restrict-list" class="chips" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <button id="settings-save" type="button" style="width:100%; background: var(--accent); color: var(--accent-contrast); border:none; border-radius:12px; padding:12px; font:800 var(--fs)/1.2 system-ui;">Save Changes</button>
+        </div>
+      `;
+      settingsPanel.appendChild(wrap);
+
+      // Swatches
+      wrap.querySelectorAll(".swatch").forEach(btn => {
+        btn.addEventListener("click", () => {
+          settings.theme = btn.getAttribute("data-theme") || "violet";
+          wrap.querySelectorAll(".swatch").forEach(sw => sw.setAttribute("aria-selected", sw === btn ? "true" : "false"));
+          applySettings(); saveSettings();
+        });
+      });
+
+      // Mic toggle (visual only for now)
+      wrap.querySelector("#setting-mic")?.addEventListener("change", (e) => {
+        settings.micEnabled = !!e.target.checked;
+        saveSettings();
+      });
+
+      const listEl = wrap.querySelector("#restrict-list");
+      const inputEl = wrap.querySelector("#restrict-input");
+
+      renderRestrictedList = function() {
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        const items = Array.isArray(settings.restrictedSites) ? settings.restrictedSites : [];
+        for (const site of items) {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.innerHTML = `<span>${site}</span><button type="button" aria-label="Remove ${site}">✕</button>`;
+          chip.querySelector("button")?.addEventListener("click", () => {
+            settings.restrictedSites = items.filter(s => s !== site);
+            saveSettings(); applySettings(); renderRestrictedList();
+          });
+          listEl.appendChild(chip);
+        }
+      };
+
+      wrap.querySelector("#restrict-add")?.addEventListener("click", () => {
+        const v = (inputEl?.value || "").trim();
+        if (!v) return;
+        const arr = Array.isArray(settings.restrictedSites) ? settings.restrictedSites.slice() : [];
+        if (!arr.includes(v)) arr.push(v);
+        settings.restrictedSites = arr;
+        inputEl.value = "";
+        saveSettings(); applySettings(); renderRestrictedList();
+      });
+
+      wrap.querySelector("#settings-save")?.addEventListener("click", () => {
+        saveSettings();
+        toast("Settings saved");
+      });
+    }
 
     // Inject AI settings UI into Settings panel
     (function setupAiSettings() {
@@ -830,18 +1148,31 @@
         navLinks: Array.from(document.querySelectorAll("a[href]")).filter(a => isVisible(a)).slice(0, 50).map(a => (a.innerText || a.textContent || "").trim()).filter(Boolean),
         buttons: Array.from(document.querySelectorAll("button,[role=button],input[type=button],input[type=submit]")).filter(b => isVisible(b)).slice(0, 50).map(b => (b.innerText || b.value || "").trim()).filter(Boolean),
       };
-      // Placeholder "thinking…" message
-      appendMsg("bot", "Thinking…");
+      // Typing indicator while we call the model
+      showTypingIndicator();
       try {
         const res = await chrome.runtime.sendMessage({ type: "HERMES_AI_ASK", userText, context: ctx });
         if (!res?.ok) {
           appendMsg("bot", res?.error || "AI request failed.");
           return;
         }
+        hideTypingIndicator();
         const content = res.content || "";
         const { message, plan } = splitAiContent(content);
-        const finalMsg = message && message.trim().length ? message.trim() : (plan?.goal ? `Plan ready: ${plan.goal}` : "I created steps for you below.");
-        appendMsg("bot", finalMsg);
+        // Build a neatly formatted bot response (instructions inside the chat bubble)
+        let rich = "";
+        if (message && message.trim().length) {
+          rich += `<div class="text">${escapeHTML(message.trim())}</div>`;
+        }
+        if (plan && Array.isArray(plan.steps) && plan.steps.length) {
+          const steps = plan.steps.map((s, i) => `<li>${escapeHTML(s.instruction || `Step ${i + 1}`)}</li>`).join("");
+          const goal = escapeHTML(plan.goal || "Proposed steps");
+          rich += `<div class="card"><div class="title">${goal}</div><ol>${steps}</ol></div>`;
+        }
+        if (!rich) {
+          rich = `<div class="text">${escapeHTML("I created steps for you below.")}</div>`;
+        }
+        appendBotRich(rich);
         if (plan) {
           renderPlan(plan);
         }
@@ -873,25 +1204,13 @@
     }
 
     function renderPlan(plan) {
+      // Minimal run button (do not repeat instructions here)
       const container = document.createElement("div");
       container.className = "ai-plan";
-      const conf = typeof plan.confidence === "number" ? (plan.confidence * 100).toFixed(0) + "%" : "n/a";
-      const website = plan.website?.title ? `${plan.website.title}` : (plan.website?.url || "");
       container.innerHTML = `
-        <div class="plan-title">Plan: ${plan.goal || "Proposed steps"}</div>
-        <div class="plan-meta">${website ? `Website: ${website} • ` : ""}Confidence: ${conf}</div>
-        <ol class="steps"></ol>
-        <button type="button" id="ai-plan-run">Run plan as guide</button>
+        <button type="button" id="ai-plan-run">Begin Guide</button>
       `;
-      const list = container.querySelector(".steps");
-      for (const s of plan.steps || []) {
-        const li = document.createElement("li");
-        const hint = s.selector_hint ? ` (hint: ${s.selector_hint})` : "";
-        li.textContent = `${s.instruction || "Do this"}${hint}`;
-        list.appendChild(li);
-      }
       panel.querySelector("#panel-ask")?.appendChild(container);
-
       container.querySelector("#ai-plan-run")?.addEventListener("click", () => {
         createDynamicGuideFromPlan(plan);
         uiControl.close();
@@ -925,7 +1244,7 @@
           <div class="history-title">${it.name}</div>
           <div class="history-desc">${it.description}</div>
           <div class="history-actions">
-            <button type="button" data-id="${it.id}">Replay guide</button>
+            <button type="button" data-id="${it.id}">Start Guide</button>
           </div>
         `;
         ul.appendChild(li);
@@ -939,14 +1258,27 @@
             return;
           }
           activateTab("tab-ask");
-          speak("Starting demo guide");
+          speak("Starting guide");
           startGuide(id);
         });
+      });
+
+      // Start New Chat button like Figma
+      const newChat = document.createElement("div");
+      newChat.style.marginTop = "12px";
+      newChat.innerHTML = `<button type="button" id="start-new-chat" style="
+        width:100%; background: var(--accent); color: var(--accent-contrast);
+        border:none; border-radius:12px; padding:12px; font:800 var(--fs)/1.2 system-ui;">Start New Chat</button>`;
+      ul.parentElement?.appendChild(newChat);
+      newChat.querySelector("#start-new-chat")?.addEventListener("click", () => {
+        activateTab("tab-ask");
+        chatInput?.focus();
       });
     }
 
     // Initial tab and data load
     activateTab("tab-ask");
+    setupThemeAndPrivacy();
     loadSettings();
     loadHistoryAndRender();
 
@@ -1201,8 +1533,8 @@
         appendMsg("bot", "Guide not found in this prototype.");
         return;
       }
-      if (!settings.enabled) {
-        appendMsg("bot", "Assistant is turned off. Enable it in Settings to run guides.");
+      if (!canRunAssistant()) {
+        appendMsg("bot", "Assistant is turned off for this site. Update Settings to continue.");
         return;
       }
       ensureGuideUI();
