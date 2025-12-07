@@ -655,7 +655,7 @@
     panel.setAttribute("aria-labelledby", "hermes-title");
     panel.innerHTML = `
       <div class="hermes-header">
-        <div id="hermes-title" class="hermes-title">AI Breadcrumb Guide</div>
+        <div id="hermes-title" class="hermes-title">ATLAS</div>
         <div class="header-actions">
           <button class="hermes-gear icon-btn" type="button" aria-label="Open settings" title="Settings">⚙</button>
           <button class="hermes-close icon-btn" type="button" aria-label="Close panel" title="Close">✕</button>
@@ -670,10 +670,10 @@
       <section id="panel-ask" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-ask">
         <div class="off-banner" id="banner-off" hidden>Assistant is turned off. You can enable it in Settings.</div>
         <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Chat messages"></div>
-        <div class="chat-input-row">
-          <input id="chat-input" type="text" placeholder="Ask where to go…" aria-label="Chat input" />
-          <button id="chat-send" type="button" aria-label="Send message">➤</button>
-        </div>
+        <form id="chat-form" class="chat-input-row" autocomplete="off" aria-label="Chat form">
+          <input id="chat-input" name="hermes-chat" type="text" placeholder="Ask where to go…" aria-label="Chat input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-autocomplete="none" inputmode="text" enterkeyhint="send" />
+          <button id="chat-send" type="submit" aria-label="Send message">➤</button>
+        </form>
       </section>
 
       <section id="panel-history" class="panel" role="tabpanel" tabindex="0" aria-labelledby="tab-history" hidden>
@@ -892,6 +892,7 @@
     const chatLog = shadow.getElementById("chat-log");
     const chatInput = shadow.getElementById("chat-input");
     const chatSend = shadow.getElementById("chat-send");
+    const chatForm = shadow.getElementById("chat-form");
 
     function formatTime(d) {
       try { return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return ""; }
@@ -981,6 +982,7 @@
     chatInput?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); onSend(); }
     });
+    chatForm?.addEventListener("submit", (e) => { e.preventDefault(); onSend(); });
 
     // Settings controls wiring
     shadow.getElementById("setting-text-size")?.addEventListener("change", (e) => {
